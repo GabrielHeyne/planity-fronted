@@ -4,10 +4,11 @@ import Image from "next/image";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import { readFileAsData } from "@/utils/readFile"; // solo para validación de nombre
+import { readFileAsData } from "@/utils/readFile";
 
 export default function Home() {
   const [origen, setOrigen] = useState("base");
+  const [cargando, setCargando] = useState(false); // 🆕 Indicador de carga
 
   const [archivos, setArchivos] = useState({
     demanda: null,
@@ -40,40 +41,41 @@ export default function Home() {
     setArchivos((prev) => ({ ...prev, [tipo]: archivo }));
   };
 
- const procesarArchivos = async () => {
-  try {
-    const formData = new FormData();
-    formData.append("demanda", archivos.demanda);
-    formData.append("stock", archivos.stockHistorico); // el backend espera "stock"
+  const procesarArchivos = async () => {
+    try {
+      setCargando(true); // 🆕 Mostrar mensaje
+      const formData = new FormData();
+      formData.append("demanda", archivos.demanda);
+      formData.append("stock", archivos.stockHistorico);
 
-    const response = await fetch("http://localhost:8001/limpiar-demanda", {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch("https://planity-backend.onrender.com/limpiar-demanda", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error("Error al limpiar la demanda");
+      if (!response.ok) {
+        throw new Error("Error al limpiar la demanda");
+      }
+
+      const demandaLimpia = await response.json();
+      sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
+
+      toast.success("✅ Archivos procesados correctamente", {
+        position: "top-center",
+        className: "text-xs",
+      });
+    } catch (error) {
+      console.error("❌ Error al procesar archivos:", error);
+      toast.error("❌ Error al conectar con el backend", {
+        position: "top-center",
+      });
+    } finally {
+      setCargando(false); // 🆕 Ocultar mensaje
     }
-
-    const demandaLimpia = await response.json();
-    sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
-
-    toast.success("Archivos procesados correctamente", {
-      position: "top-center",
-      className: "text-xs",
-    });
-  } catch (error) {
-    console.error("❌ Error al procesar archivos:", error);
-    toast.error("❌ Error al conectar con el backend", {
-      position: "top-center",
-    });
-  }
-};
-
+  };
 
   return (
     <main className="min-h-screen bg-white px-4 pt-2 pb-6 flex flex-col items-center">
-      {/* Banner */}
       <div className="w-full max-w-6xl">
         <Image
           src="/banner1.png"
@@ -85,14 +87,12 @@ export default function Home() {
         />
       </div>
 
-      {/* Intro */}
       <p className="text-gray-700 text-sm max-w-4xl text-center mt-4">
         Planity es una plataforma inteligente para la planificación de demanda e inventarios.
         Diseñada para ayudarte a tomar decisiones estratégicas basadas en datos reales,
         Planity automatiza procesos clave y entrega insights accionables para optimizar tus operaciones.
       </p>
 
-      {/* Módulos */}
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl w-full text-xs">
         {[
           "✅ Limpieza de Demanda",
@@ -113,7 +113,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Origen */}
       <div className="mt-10 text-sm text-gray-800 max-w-lg w-full flex flex-col items-center">
         <p className="mb-4 font-medium text-center">Selecciona el origen de los datos:</p>
         <div className="flex flex-row gap-6 justify-center">
@@ -140,7 +139,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Carga manual */}
       {origen === "manual" && (
         <div className="mt-6 w-full max-w-2xl bg-gray-50 border border-gray-200 p-4 rounded-md shadow-sm">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Sube tus archivos:</h3>
@@ -167,12 +165,18 @@ export default function Home() {
         </div>
       )}
 
-      {/* Botón acción */}
+      {/* 🆕 Indicador visual de carga */}
+      {cargando && (
+        <div className="text-sm text-indigo-700 mt-6 font-medium text-center">
+          ⏳ Procesando archivos... Esto puede tardar hasta 2 minutos.
+        </div>
+      )}
+
       <button
         className={`mt-8 px-6 py-2 text-white text-sm rounded-md transition ${
           origen ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-300 cursor-not-allowed"
         }`}
-        disabled={!origen}
+        disabled={!origen || cargando}
         onClick={async () => {
           if (origen === "manual") {
             const faltantes = Object.entries(archivos)
@@ -196,12 +200,13 @@ export default function Home() {
           }
         }}
       >
-        🚀 Comenzar planificación
+        {cargando ? "Procesando..." : "🚀 Comenzar planificación"}
       </button>
 
       <ToastContainer />
     </main>
   );
 }
+
 
 
