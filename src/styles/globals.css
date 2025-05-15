@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados opcionales */
+body {
+  @apply font-sans bg-gray-50 text-gray-900;
+}
+
+h1, h2, h3, h4 {
+  @apply font-semibold;
+}
+
+a {
+  @apply text-blue-600 hover:underline;
+}

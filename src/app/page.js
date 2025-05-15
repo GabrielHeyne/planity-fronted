@@ -1,103 +1,207 @@
+"use client";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+import { readFileAsData } from "@/utils/readFile"; // solo para validación de nombre
 
 export default function Home() {
+  const [origen, setOrigen] = useState("base");
+
+  const [archivos, setArchivos] = useState({
+    demanda: null,
+    stock: null,
+    maestro: null,
+    reposiciones: null,
+    stockHistorico: null,
+  });
+
+  useEffect(() => {
+    const yaHayDatos = sessionStorage.getItem("demanda_limpia");
+    if (yaHayDatos) setOrigen("manual");
+  }, []);
+
+  const handleArchivo = (e, tipo) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+
+    const nombre = archivo.name.toLowerCase();
+    const valido =
+      nombre.endsWith(".csv") || nombre.endsWith(".xlsx") || nombre.endsWith(".xls");
+
+    if (!valido) {
+      toast.warning("⚠️ Solo se permiten archivos .csv o Excel", {
+        position: "top-center",
+      });
+      return;
+    }
+
+    setArchivos((prev) => ({ ...prev, [tipo]: archivo }));
+  };
+
+ const procesarArchivos = async () => {
+  try {
+    const formData = new FormData();
+    formData.append("demanda", archivos.demanda);
+    formData.append("stock", archivos.stockHistorico); // el backend espera "stock"
+
+    const response = await fetch("http://localhost:8001/limpiar-demanda", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Error al limpiar la demanda");
+    }
+
+    const demandaLimpia = await response.json();
+    sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
+
+    toast.success("Archivos procesados correctamente", {
+      position: "top-center",
+      className: "text-xs",
+    });
+  } catch (error) {
+    console.error("❌ Error al procesar archivos:", error);
+    toast.error("❌ Error al conectar con el backend", {
+      position: "top-center",
+    });
+  }
+};
+
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+    <main className="min-h-screen bg-white px-4 pt-2 pb-6 flex flex-col items-center">
+      {/* Banner */}
+      <div className="w-full max-w-6xl">
         <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
+          src="/banner1.png"
+          alt="Banner Planity"
+          width={1200}
+          height={200}
+          className="rounded-xl shadow-md w-full h-auto"
           priority
         />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* Intro */}
+      <p className="text-gray-700 text-sm max-w-4xl text-center mt-4">
+        Planity es una plataforma inteligente para la planificación de demanda e inventarios.
+        Diseñada para ayudarte a tomar decisiones estratégicas basadas en datos reales,
+        Planity automatiza procesos clave y entrega insights accionables para optimizar tus operaciones.
+      </p>
+
+      {/* Módulos */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl w-full text-xs">
+        {[
+          "✅ Limpieza de Demanda",
+          "📊 Forecast automático por SKU",
+          "📦 Políticas de Inventario",
+          "📉 Proyección de stock",
+          "🧠 Simulación de escenarios",
+          "🛒 Definición de compras",
+          "📈 Paneles interactivos con KPIs",
+          "🤖 Planificador Virtual con IA",
+        ].map((texto, i) => (
+          <button
+            key={i}
+            className="border border-gray-300 rounded-lg px-3 py-3 flex items-center justify-center text-center gap-2 hover:shadow transition"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            {texto}
+          </button>
+        ))}
+      </div>
+
+      {/* Origen */}
+      <div className="mt-10 text-sm text-gray-800 max-w-lg w-full flex flex-col items-center">
+        <p className="mb-4 font-medium text-center">Selecciona el origen de los datos:</p>
+        <div className="flex flex-row gap-6 justify-center">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="origen"
+              value="base"
+              checked={origen === "base"}
+              onChange={() => setOrigen("base")}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Desde Base de Datos
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="origen"
+              value="manual"
+              checked={origen === "manual"}
+              onChange={() => setOrigen("manual")}
+            />
+            Carga manual de archivos
+          </label>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+
+      {/* Carga manual */}
+      {origen === "manual" && (
+        <div className="mt-6 w-full max-w-2xl bg-gray-50 border border-gray-200 p-4 rounded-md shadow-sm">
+          <h3 className="text-sm font-semibold mb-3 text-gray-700">Sube tus archivos:</h3>
+          {[
+            { label: "Demanda histórica", key: "demanda" },
+            { label: "Stock actual", key: "stock" },
+            { label: "Maestro de productos", key: "maestro" },
+            { label: "Reposiciones futuras", key: "reposiciones" },
+            { label: "Stock histórico", key: "stockHistorico" },
+          ].map(({ label, key }) => (
+            <div key={key} className="mb-3">
+              <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => handleArchivo(e, key)}
+                className="text-sm"
+              />
+              {archivos[key] && (
+                <p className="text-xs text-green-600 mt-1">✔️ {archivos[key].name} listo</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botón acción */}
+      <button
+        className={`mt-8 px-6 py-2 text-white text-sm rounded-md transition ${
+          origen ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-300 cursor-not-allowed"
+        }`}
+        disabled={!origen}
+        onClick={async () => {
+          if (origen === "manual") {
+            const faltantes = Object.entries(archivos)
+              .filter(([_, file]) => !file)
+              .map(([nombre]) => nombre);
+
+            if (faltantes.includes("demanda") || faltantes.includes("stockHistorico")) {
+              toast.warning("⚠️ Faltan archivos requeridos: demanda y stock histórico", {
+                position: "top-center",
+              });
+              return;
+            }
+
+            await procesarArchivos();
+          }
+
+          if (origen === "base") {
+            toast.info("🔄 En futuras versiones se conectará a la base de datos.", {
+              position: "top-center",
+            });
+          }
+        }}
+      >
+        🚀 Comenzar planificación
+      </button>
+
+      <ToastContainer />
+    </main>
   );
 }
+
+
