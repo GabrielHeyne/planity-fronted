@@ -8,13 +8,23 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  BarController, // ✅ necesario
   Tooltip,
   Legend,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import { API_BASE_URL } from "@/utils/apiBase";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  BarController, // ✅ importante
+  Tooltip,
+  Legend
+);
 
 export default function ForecastPage() {
   const [forecastData, setForecastData] = useState([]);
@@ -46,7 +56,7 @@ export default function ForecastPage() {
 
           if (data.forecast && data.forecast.length > 0) {
             const primerSku = data.forecast[0].sku;
-            setSkuSeleccionado(primerSku); // ✅ seleccionar automáticamente el primer SKU
+            setSkuSeleccionado(primerSku);
           }
         })
         .catch((err) => console.error("❌ Error al obtener forecast:", err));
@@ -64,8 +74,12 @@ export default function ForecastPage() {
   );
 
   const demandaLimpia = dataFiltrada.map((d) => Number(d.demanda_limpia) || 0);
-  const forecast = dataFiltrada.map((d) => d.tipo_mes !== "histórico" ? Number(d.forecast) || null : null);
-  const forecastUp = dataFiltrada.map((d) => d.tipo_mes === "proyección" ? Number(d.forecast_up) || null : null);
+  const forecast = dataFiltrada.map((d) =>
+    d.tipo_mes !== "histórico" ? Number(d.forecast) || null : null
+  );
+  const forecastUp = dataFiltrada.map((d) =>
+    d.tipo_mes === "proyección" ? Number(d.forecast_up) || null : null
+  );
 
   return (
     <div className="p-6 space-y-8">
@@ -101,7 +115,7 @@ export default function ForecastPage() {
                 type: "bar",
                 label: "Demanda Limpia",
                 data: demandaLimpia,
-                backgroundColor: "rgba(37, 99, 235, 0.8)", // azul oscuro
+                backgroundColor: "rgba(37, 99, 235, 0.8)",
                 borderRadius: 4,
                 borderSkipped: false,
               },
@@ -109,7 +123,7 @@ export default function ForecastPage() {
                 type: "line",
                 label: "Forecast proyectado",
                 data: forecast,
-                borderColor: "#16a34a", // verde
+                borderColor: "#16a34a",
                 borderWidth: 2,
                 pointRadius: 4,
                 pointBackgroundColor: "#16a34a",
@@ -119,7 +133,7 @@ export default function ForecastPage() {
                 type: "line",
                 label: "Forecast con Margen",
                 data: forecastUp,
-                borderColor: "#f97316", // naranja
+                borderColor: "#f97316",
                 borderDash: [4, 4],
                 borderWidth: 2,
                 pointRadius: 4,
@@ -193,6 +207,7 @@ export default function ForecastPage() {
     </div>
   );
 }
+
 
 
 
