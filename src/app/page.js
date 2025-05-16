@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import { API_BASE_URL } from "@/utils/apiBase"; // ✅ Importación de URL centralizada
 import { readFileAsData } from "@/utils/readFile";
 
 export default function Home() {
   const [origen, setOrigen] = useState("base");
-  const [cargando, setCargando] = useState(false); // 🆕 Indicador de carga
+  const [cargando, setCargando] = useState(false);
 
   const [archivos, setArchivos] = useState({
     demanda: null,
@@ -43,12 +43,15 @@ export default function Home() {
 
   const procesarArchivos = async () => {
     try {
-      setCargando(true); // 🆕 Mostrar mensaje
+      setCargando(true);
+
       const formData = new FormData();
       formData.append("demanda", archivos.demanda);
       formData.append("stock", archivos.stockHistorico);
 
-      const response = await fetch("https://planity-backend.onrender.com/limpiar-demanda", {
+      console.log("🌍 Usando API_BASE_URL:", API_BASE_URL);
+
+      const response = await fetch(`${API_BASE_URL}/limpiar-demanda`, {
         method: "POST",
         body: formData,
       });
@@ -60,7 +63,7 @@ export default function Home() {
       const demandaLimpia = await response.json();
       sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
 
-      toast.success("✅ Archivos procesados correctamente", {
+      toast.success("Archivos procesados correctamente", {
         position: "top-center",
         className: "text-xs",
       });
@@ -70,9 +73,10 @@ export default function Home() {
         position: "top-center",
       });
     } finally {
-      setCargando(false); // 🆕 Ocultar mensaje
+      setCargando(false);
     }
   };
+
 
   return (
     <main className="min-h-screen bg-white px-4 pt-2 pb-6 flex flex-col items-center">
