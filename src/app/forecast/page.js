@@ -31,37 +31,42 @@ export default function ForecastPage() {
   const [skuSeleccionado, setSkuSeleccionado] = useState("");
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("demanda_limpia");
-    console.log("🌍 Usando URL:", API_BASE_URL);
+  const forecastGuardado = sessionStorage.getItem("forecast");
 
-    if (stored) {
-      const demanda = JSON.parse(stored);
+  if (forecastGuardado) {
+    console.log("⚡️ Forecast ya disponible en sesión.");
+    const parsed = JSON.parse(forecastGuardado);
+    setForecastData(parsed);
+    if (parsed.length > 0) setSkuSeleccionado(parsed[0].sku);
+    return;
+  }
 
-      const datosForecast = demanda.map((fila) => ({
-        sku: fila.sku,
-        fecha: fila.fecha,
-        demanda: fila.demanda ?? fila.demanda_sin_outlier ?? 0,
-        demanda_sin_outlier: fila.demanda_sin_outlier ?? fila.demanda ?? 0,
-      }));
+  const stored = sessionStorage.getItem("demanda_limpia");
+  if (stored) {
+    const demanda = JSON.parse(stored);
 
-      fetch(`${API_BASE_URL}/forecast`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(datosForecast),
+    const datosForecast = demanda.map((fila) => ({
+      sku: fila.sku,
+      fecha: fila.fecha,
+      demanda: fila.demanda ?? fila.demanda_sin_outlier ?? 0,
+      demanda_sin_outlier: fila.demanda_sin_outlier ?? fila.demanda ?? 0,
+    }));
+
+    fetch(`${API_BASE_URL}/forecast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosForecast),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const resultado = data.forecast || [];
+        sessionStorage.setItem("forecast", JSON.stringify(resultado));
+        setForecastData(resultado);
+        if (resultado.length > 0) setSkuSeleccionado(resultado[0].sku);
       })
-        .then((res) => res.json())
-        .then((data) => {
-          console.log("📦 Forecast recibido:", data);
-          setForecastData(data.forecast || []);
-
-          if (data.forecast && data.forecast.length > 0) {
-            const primerSku = data.forecast[0].sku;
-            setSkuSeleccionado(primerSku);
-          }
-        })
-        .catch((err) => console.error("❌ Error al obtener forecast:", err));
-    }
-  }, []);
+      .catch((err) => console.error("❌ Error al obtener forecast:", err));
+  }
+}, []);
 
   if (!forecastData.length) {
     return <div className="p-6 text-gray-500 text-sm">No hay datos de forecast disponibles.</div>;

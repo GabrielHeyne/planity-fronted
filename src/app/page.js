@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { API_BASE_URL } from "@/utils/apiBase"; // ✅ Importación de URL centralizada
-import { readFileAsData } from "@/utils/readFile";
+import { API_BASE_URL } from "@/utils/apiBase";
 
 export default function Home() {
   const [origen, setOrigen] = useState("base");
@@ -32,7 +31,7 @@ export default function Home() {
       nombre.endsWith(".csv") || nombre.endsWith(".xlsx") || nombre.endsWith(".xls");
 
     if (!valido) {
-      toast.warning("⚠️ Solo se permiten archivos .csv o Excel", {
+      toast.warning("Solo se permiten archivos .csv o Excel", {
         position: "top-center",
       });
       return;
@@ -56,27 +55,42 @@ export default function Home() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Error al limpiar la demanda");
-      }
+      if (!response.ok) throw new Error("Error al limpiar la demanda");
 
       const demandaLimpia = await response.json();
       sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
 
-      toast.success("Archivos procesados correctamente", {
+      const datosForecast = demandaLimpia.map((fila) => ({
+        sku: fila.sku,
+        fecha: fila.fecha,
+        demanda: fila.demanda ?? fila.demanda_sin_outlier ?? 0,
+        demanda_sin_outlier: fila.demanda_sin_outlier ?? fila.demanda ?? 0,
+      }));
+
+      const resForecast = await fetch(`${API_BASE_URL}/forecast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosForecast),
+      });
+
+      if (!resForecast.ok) throw new Error("Error al calcular forecast");
+
+      const resultadoForecast = await resForecast.json();
+      sessionStorage.setItem("forecast", JSON.stringify(resultadoForecast.forecast || []));
+
+      toast.success("Archivos procesados y forecast generado", {
         position: "top-center",
         className: "text-xs",
       });
     } catch (error) {
       console.error("❌ Error al procesar archivos:", error);
-      toast.error("❌ Error al conectar con el backend", {
+      toast.error("Error al conectar con el backend", {
         position: "top-center",
       });
     } finally {
       setCargando(false);
     }
   };
-
 
   return (
     <main className="min-h-screen bg-white px-4 pt-2 pb-6 flex flex-col items-center">
@@ -169,7 +183,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 🆕 Indicador visual de carga */}
       {cargando && (
         <div className="text-sm text-indigo-700 mt-6 font-medium text-center">
           ⏳ Procesando archivos... Esto puede tardar hasta 2 minutos.
@@ -188,7 +201,7 @@ export default function Home() {
               .map(([nombre]) => nombre);
 
             if (faltantes.includes("demanda") || faltantes.includes("stockHistorico")) {
-              toast.warning("⚠️ Faltan archivos requeridos: demanda y stock histórico", {
+              toast.warning("Faltan archivos requeridos: demanda y stock histórico", {
                 position: "top-center",
               });
               return;
@@ -198,7 +211,7 @@ export default function Home() {
           }
 
           if (origen === "base") {
-            toast.info("🔄 En futuras versiones se conectará a la base de datos.", {
+            toast.info("En futuras versiones se conectará a la base de datos.", {
               position: "top-center",
             });
           }
@@ -207,10 +220,19 @@ export default function Home() {
         {cargando ? "Procesando..." : "🚀 Comenzar planificación"}
       </button>
 
-      <ToastContainer />
+      <ToastContainer
+        position="top-center"
+        className="text-xs"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        progressClassName="!bg-green-500"
+      />
     </main>
   );
 }
-
-
-
