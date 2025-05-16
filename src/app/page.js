@@ -40,6 +40,26 @@ export default function Home() {
     setArchivos((prev) => ({ ...prev, [tipo]: archivo }));
   };
 
+  const readerAsync = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target.result;
+        const rows = text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line);
+        const keys = rows[0].split(",").map((k) => k.trim().toLowerCase());
+        const data = rows.slice(1).map((row) => {
+          const values = row.split(",").map((v) => v.trim());
+          return Object.fromEntries(keys.map((k, i) => [k, values[i]]));
+        });
+        resolve(data);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+
   const procesarArchivos = async () => {
     try {
       setCargando(true);
@@ -78,7 +98,40 @@ export default function Home() {
       const resultadoForecast = await resForecast.json();
       sessionStorage.setItem("forecast", JSON.stringify(resultadoForecast.forecast || []));
 
-      toast.success("Archivos procesados y forecast generado", {
+      // Leer y guardar maestro, stock y reposiciones
+      const maestro = await readerAsync(archivos.maestro);
+const reposiciones = await readerAsync(archivos.reposiciones);
+const stock_actual = await readerAsync(archivos.stock);
+const stock_historico = await readerAsync(archivos.stockHistorico);
+
+const stock_historico_limpio = stock_historico.map((row) => ({
+  sku: row.sku,
+  fecha: row.fecha,
+  stock: parseFloat(row.stock) || 0,
+}));
+
+sessionStorage.setItem("maestro", JSON.stringify(maestro));
+sessionStorage.setItem("reposiciones", JSON.stringify(reposiciones));
+sessionStorage.setItem("stock_actual", JSON.stringify(stock_actual));
+sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio));
+
+      const resStock = await fetch(`${API_BASE_URL}/proyeccion-stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          forecast: resultadoForecast.forecast,
+          stock_actual,
+          reposiciones,
+          maestro,
+        }),
+      });
+
+      if (!resStock.ok) throw new Error("Error al proyectar stock");
+
+      const resultadoStock = await resStock.json();
+      sessionStorage.setItem("stock_proyectado", JSON.stringify(resultadoStock));
+
+      toast.success("✅ Todo listo: Forecast y proyección generados", {
         position: "top-center",
         className: "text-xs",
       });
@@ -236,3 +289,4 @@ export default function Home() {
     </main>
   );
 }
+
