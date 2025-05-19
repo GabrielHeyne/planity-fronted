@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { saveAs } from "file-saver";
 import { PackageSearch } from "lucide-react";
+import { History } from "lucide-react";
+import { Activity } from "lucide-react";
 
 
 ChartJS.register(
@@ -102,45 +104,28 @@ export default function ProyeccionStockPage() {
     </div>
   );
 
-  const chartLine = {
-    labels: [...new Set(filtrado.map((f) => f.mes))],
+  const chartForecastMensual = (() => {
+  const agrupado = filtrado.reduce((acc, row) => {
+    if (!row.mes || isNaN(row.forecast)) return acc;
+    acc[row.mes] = (acc[row.mes] || 0) + Number(row.forecast || 0);
+    return acc;
+  }, {});
+  const labels = Object.keys(agrupado).sort();
+  return {
+    labels,
     datasets: [
       {
-        label: "Stock Final",
-        data: (() => {
-          const agrupado = {};
-          filtrado.forEach((f) => {
-            if (!agrupado[f.mes]) agrupado[f.mes] = 0;
-            agrupado[f.mes] += f.stock_final_mes || 0;
-          });
-          return Object.entries(agrupado)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([_, v]) => v);
-        })(),
-        borderColor: "#2563eb",
-        backgroundColor: "#2563eb20",
-        tension: 0.3,
-        fill: false,
-      },
-      {
-        label: "Forecast",
-        data: (() => {
-          const agrupado = {};
-          filtrado.forEach((f) => {
-            if (!agrupado[f.mes]) agrupado[f.mes] = 0;
-            agrupado[f.mes] += f.forecast || 0;
-          });
-          return Object.entries(agrupado)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([_, v]) => v);
-        })(),
-        borderColor: "#f97316",
-        borderDash: [5, 5],
+        label: "Forecast Mensual",
+        data: labels.map((mes) => agrupado[mes]),
+        borderColor: "#6366f1",
+        backgroundColor: "#6366f120",
         tension: 0.3,
         fill: false,
       },
     ],
   };
+})();
+
 
   const chartBar = {
     labels: [...new Set(filtrado.map((f) => f.mes))],
@@ -197,7 +182,6 @@ export default function ProyeccionStockPage() {
   };
 })();
 
-
   const chartDemanda = (() => {
     const filtradoDemanda = demandaLimpia.filter(
       (d) => skuSeleccionado === "__TOTAL__" || d.sku === skuSeleccionado
@@ -233,14 +217,89 @@ export default function ProyeccionStockPage() {
     };
   })();
 
-  const top10 = Object.entries(
-    data.reduce((acc, row) => {
-      acc[row.sku] = (acc[row.sku] || 0) + (row.perdida_proyectada_euros || 0);
-      return acc;
-    }, {})
-  )
+  const chartStockProyectado = {
+  labels: [...new Set(filtrado.map((f) => f.mes))],
+  datasets: [
+    {
+      label: "Stock Final",
+      data: (() => {
+        const agrupado = {};
+        filtrado.forEach((f) => {
+          if (!agrupado[f.mes]) agrupado[f.mes] = 0;
+          agrupado[f.mes] += f.stock_final_mes || 0;
+        });
+        return Object.entries(agrupado)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([_, v]) => v);
+      })(),
+      borderColor: "#2563eb",
+      backgroundColor: "#2563eb20",
+      tension: 0.3,
+      fill: false,
+    },
+  ],
+};
+
+
+  const chartPerdidasHistoricas = (() => {
+  const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
+  const preciosPorSku = maestro.reduce((acc, row) => {
+    acc[row.sku] = +row.precio_venta || 0;
+    return acc;
+  }, {});
+
+  const agrupado = demandaLimpia.reduce((acc, row) => {
+    const mes = row.fecha?.slice(0, 7);
+    const original = +row.demanda_original || 0;
+    const sinStockout = +row.demanda_sin_stockout || 0;
+    const perdida = Math.max(0, sinStockout - original);
+    const precioVenta = preciosPorSku[row.sku] || 0;
+
+    if (!mes || isNaN(perdida) || !precioVenta) return acc;
+
+    acc[mes] = (acc[mes] || 0) + perdida * precioVenta;
+    return acc;
+  }, {});
+
+  const labels = Object.keys(agrupado).sort();
+  const valores = labels.map((mes) => agrupado[mes]);
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: "Pérdida Histórica (€)",
+        data: valores,
+        backgroundColor: "#ef4444",
+      },
+    ],
+  };
+})();
+
+  // 🔝 Top 10 Pérdidas Proyectadas (ya existe)
+const top10Proyectadas = Object.entries(
+  data.reduce((acc, row) => {
+    acc[row.sku] = (acc[row.sku] || 0) + (row.perdida_proyectada_euros || 0);
+    return acc;
+  }, {})
+)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 10);
+
+// 🔝 Top 10 Pérdidas Históricas
+const top10Historicas = (() => {
+  if (!demandaLimpia.length) return [];
+  const perdidasPorSku = demandaLimpia.reduce((acc, row) => {
+    const original = +row.demanda_original || 0;
+    const limpia = +row.demanda_sin_outlier || 0;
+    const perdida = Math.max(0, limpia - original);
+    acc[row.sku] = (acc[row.sku] || 0) + perdida;
+    return acc;
+  }, {});
+  return Object.entries(perdidasPorSku)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
+})();
 
   const detalle = skuSeleccionado === "__TOTAL__"
     ? data.filter((d) => d.sku === data[0]?.sku)
@@ -275,71 +334,115 @@ export default function ProyeccionStockPage() {
             <option key={sku} value={sku}>{sku}</option>
           ))}
         </select>
+      </div>  
+
+{/* Gráficos: Histórico y Proyección lado a lado */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* Columna 1: Histórico */}
+  <div className="space-y-4">
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <PackageSearch className="w-4 h-4" />
+        Stock Histórico Mensual
       </div>
+      <Line data={chartStockHistorico} />
+    </div>
 
-      {/* Gráficos principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-            <TrendingDown className="w-4 h-4" />
-            Stock Final vs Forecast
-          </div>
-          <Line data={chartLine} />
-        </div>
-
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-            <BarChart className="w-4 h-4" />
-            Pérdida Estimada en Euros
-          </div>
-          <Bar data={chartBar} />
-        </div>
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <BarChart className="w-4 h-4" />
+        Pérdidas Históricas Mensuales
       </div>
+      <Bar data={chartPerdidasHistoricas} />
+    </div>
 
-      {/* Gráficos adicionales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-            <PackageSearch className="w-4 h-4" />
-            Stock Histórico Mensual
-          </div>
-          <Line data={chartStockHistorico} />
-        </div>
-
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-            <BarChart className="w-4 h-4" />
-            Demanda Histórica Mensual
-          </div>
-          <Line data={chartDemanda} />
-        </div>
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <BarChart className="w-4 h-4" />
+        Demanda Histórica Mensual
       </div>
+      <Line data={chartDemanda} />
+    </div>
 
-      {/* Top 10 SKUs con mayor pérdida */}
-      <div className="bg-white p-4 rounded shadow max-w-md">
-        <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-          <TrendingDown className="w-4 h-4" />
-          Top 10 SKUs con Mayor Pérdida (€)
-        </div>
-        <table className="w-full text-sm table-fixed">
-          <thead>
-            <tr>
-              <th className="text-left px-2 py-1">SKU</th>
-              <th className="text-right px-2 py-1">Pérdida (€)</th>
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <History className="w-4 h-4" />
+        Top 10 SKUs con Mayor Pérdida Histórica (€)
+      </div>
+      <table className="w-full text-sm table-fixed">
+        <thead>
+          <tr>
+            <th className="text-left px-2 py-1 font-normal">SKU</th>
+            <th className="text-right px-2 py-1 font-normal">Pérdida (€)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {top10Historicas.map(([sku, perdida], i) => (
+            <tr key={i} className="hover:bg-gray-50">
+              <td className="px-2 py-1 text-gray-700">{sku}</td>
+              <td className="px-2 py-1 text-right text-red-600">
+                € {Math.round(perdida).toLocaleString("es-CL")}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {top10.map(([sku, perdida], i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-2 py-1 text-gray-700">{sku}</td>
-                <td className="px-2 py-1 text-right font-semibold text-red-600">
-                  € {Math.round(perdida).toLocaleString("es-CL")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {/* Columna 2: Proyección */}
+  <div className="space-y-4">
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <TrendingDown className="w-4 h-4" />
+        Stock Proyectado Mensual
       </div>
+      <Line data={chartStockProyectado} />
+    </div>
+
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <BarChart className="w-4 h-4" />
+        Pérdidas Estimadas Mensuales
+      </div>
+      <Bar data={chartBar} />
+    </div>
+
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <Activity className="w-4 h-4" />
+        Forecast Mensual
+      </div>
+      <Line data={chartForecastMensual} />
+    </div>
+
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm font-medium text-gray-700">
+        <Activity className="w-4 h-4" />
+        Top 10 SKUs con Mayor Pérdida Proyectada (€)
+      </div>
+      <table className="w-full text-sm table-fixed">
+        <thead>
+          <tr>
+            <th className="text-left px-2 py-1 font-normal">SKU</th>
+            <th className="text-right px-2 py-1 font-normal">Pérdida (€)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {top10Proyectadas.map(([sku, perdida], i) => (
+            <tr key={i} className="hover:bg-gray-50">
+              <td className="px-2 py-1 text-gray-700">{sku}</td>
+              <td className="px-2 py-1 text-right text-red-600">
+                € {Math.round(perdida).toLocaleString("es-CL")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 
       {/* Detalle mensual */}
       <div className="bg-white p-4 rounded shadow">

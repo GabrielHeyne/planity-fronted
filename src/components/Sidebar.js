@@ -17,7 +17,7 @@ export default function Sidebar() {
     { href: "/demanda", label: "Demanda Total", icon: <FolderSearch size={18} /> },
     { href: "/forecast", label: "Forecast", icon: <BarChart size={18} /> },
     { href: "/proyeccion", label: "Proyección Stock", icon: <PackageSearch size={18} /> },
-    { href: "/inventario", label: "Gestión Inventarios", icon: <ShoppingCart size={18} /> },
+    { href: "/gestion", label: "Gestión Inventarios", icon: <ShoppingCart size={18} /> },
     { href: "/resumen", label: "Resumen General", icon: <FileText size={18} /> },
     { href: "/ia", label: "IA Planificador Virtual", icon: <BrainCircuit size={18} /> },
   ];

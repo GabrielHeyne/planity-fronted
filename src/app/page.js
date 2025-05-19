@@ -5,6 +5,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { API_BASE_URL } from "@/utils/apiBase";
 
+
 export default function Home() {
   const [origen, setOrigen] = useState("base");
   const [cargando, setCargando] = useState(false);
@@ -131,7 +132,7 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
       const resultadoStock = await resStock.json();
       sessionStorage.setItem("stock_proyectado", JSON.stringify(resultadoStock));
 
-      toast.success("✅ Todo listo: Forecast y proyección generados", {
+      toast.success("Todo listo: Forecast y proyección generados", {
         position: "top-center",
         className: "text-xs",
       });
