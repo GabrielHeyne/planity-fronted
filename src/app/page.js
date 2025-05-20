@@ -7,7 +7,7 @@ import { API_BASE_URL } from "@/utils/apiBase";
 
 
 export default function Home() {
-  const [origen, setOrigen] = useState("base");
+  const [origen, setOrigen] = useState("cloud");
   const [cargando, setCargando] = useState(false);
 
   const [archivos, setArchivos] = useState({
@@ -19,16 +19,12 @@ export default function Home() {
   });
 
   useEffect(() => {
-  const yaHayDatos = sessionStorage.getItem("demanda_limpia");
-  if (yaHayDatos && yaHayDatos !== "undefined") {
-    try {
-      const parsed = JSON.parse(yaHayDatos);
-      if (Array.isArray(parsed)) {
-        setOrigen("manual");
-      }
-    } catch (e) {
-      console.warn("⚠️ Error parseando demanda_limpia en sessionStorage:", e);
-    }
+  const origenGuardado = sessionStorage.getItem("origen_datos");
+
+  if (["manual", "cloud"].includes(origenGuardado)) {
+    setOrigen(origenGuardado);
+  } else {
+    setOrigen("cloud"); // Valor por defecto si no hay ninguno guardado
   }
 }, []);
 
@@ -175,7 +171,7 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
         Planity automatiza procesos clave y entrega insights accionables para optimizar tus operaciones.
       </p>
 
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl w-full text-xs">
+       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl w-full text-xs">
         {[
           "✅ Limpieza de Demanda",
           "📊 Forecast automático por SKU",
@@ -188,27 +184,17 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
         ].map((texto, i) => (
           <button
             key={i}
-            className="border border-gray-300 rounded-lg px-3 py-3 flex items-center justify-center text-center gap-2 hover:shadow transition"
-          >
+              className="border border-gray-300 rounded-lg px-3 py-3 flex items-center justify-center text-center gap-2 hover:shadow transition text-gray-800 text-xs"
+>
             {texto}
           </button>
         ))}
       </div>
 
-      <div className="mt-10 text-sm text-gray-800 max-w-lg w-full flex flex-col items-center">
-  <p className="mb-4 font-medium text-center">Selecciona el origen de los datos:</p>
+      <div className="mt-10 text-xs text-gray-700 max-w-lg w-full flex flex-col items-center">
+  <p className="mb-2 text-sm font-semibold text-center">Selecciona el origen de los datos:</p>
   <div className="flex flex-row gap-6 justify-center">
-    <label className="flex items-center gap-2">
-      <input
-        type="radio"
-        name="origen"
-        value="base"
-        checked={origen === "base"}
-        onChange={() => setOrigen("base")}
-      />
-      Desde Base de Datos
-    </label>
-    <label className="flex items-center gap-2">
+    <label className="flex items-center gap-2 whitespace-nowrap">
       <input
         type="radio"
         name="origen"
@@ -218,7 +204,7 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
       />
       Carga manual de archivos
     </label>
-    <label className="flex items-center gap-2">
+    <label className="flex items-center gap-2 whitespace-nowrap">
       <input
         type="radio"
         name="origen"
@@ -226,10 +212,13 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
         checked={origen === "cloud"}
         onChange={() => setOrigen("cloud")}
       />
-      Cargar desde la nube
+      Cargar desde BBDD
     </label>
   </div>
 </div>
+
+
+
 
 
       {origen === "manual" && (
@@ -321,11 +310,11 @@ if (data.stock_proyectado) {
 }
 
 
-      toast.success("✅ Datos cargados desde la nube correctamente", {
+      toast.success("Datos cargados desde BBDD correctamente", {
         position: "top-center",
       });
     } catch (err) {
-      console.error("❌ Error carga nube:", err);
+      console.error("Error carga nube:", err);
       toast.error("Error al cargar desde la nube", {
         position: "top-center",
       });

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import {
   Home,
   FolderSearch,
@@ -9,9 +10,15 @@ import {
   ShoppingCart,
   FileText,
   BrainCircuit,
+  Menu,
+  X
 } from "lucide-react";
 
 export default function Sidebar() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
   const menuItems = [
     { href: "/", label: "Inicio", icon: <Home size={18} /> },
     { href: "/demanda", label: "Demanda Total", icon: <FolderSearch size={18} /> },
@@ -23,26 +30,36 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="w-64 fixed top-0 bottom-0 left-0 bg-white border-r border-gray-400 shadow-sm flex flex-col px-6 py-4">
-  {/* Logo */}
-  <div className="mb-4">
-    <Image src="/planity_logo.png" alt="Logo Planity" width={220} height={80} />
-  </div>
-
-  {/* Menú */}
-  <nav className="mt-4 space-y-3 flex-1">
-    {menuItems.map((item) => (
-      <Link
-        key={item.href}
-        href={item.href}
-        className="flex items-center gap-2 text-sm text-gray-700 hover:text-indigo-600 transition"
+    <>
+      {/* Botón hamburguesa móvil */}
+      <button
+        onClick={toggleSidebar}
+        className="md:hidden p-4 fixed top-0 left-0 z-50"
       >
-        {item.icon}
-        {item.label}
-      </Link>
-    ))}
-  </nav>
-</div>
+        {isOpen ? <X size={28} /> : <Menu size={28} />}
+      </button>
 
+      {/* Sidebar */}
+      <div className={`fixed top-0 left-0 bottom-0 bg-white border-r border-gray-400 shadow-sm flex flex-col px-6 py-4 w-64 z-40 transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:flex`}>
+        <div className="mb-4">
+          <Image src="/planity_logo.png" alt="Logo Planity" width={220} height={80} />
+        </div>
+        <nav className="mt-4 space-y-3 flex-1">
+          {menuItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-2 text-sm text-gray-700 hover:text-indigo-600 transition"
+              onClick={() => setIsOpen(false)}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </>
   );
 }
+
