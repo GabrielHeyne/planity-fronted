@@ -31,7 +31,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Botón hamburguesa móvil */}
+      {/* Botón hamburguesa en móvil */}
       <button
         onClick={toggleSidebar}
         className="md:hidden p-4 fixed top-0 left-0 z-50"
@@ -39,9 +39,19 @@ export default function Sidebar() {
         {isOpen ? <X size={28} /> : <Menu size={28} />}
       </button>
 
+      {/* Fondo oscuro en mobile cuando el sidebar está abierto */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black opacity-30 z-30 md:hidden"
+          onClick={() => setIsOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
-      <div className={`fixed top-0 left-0 bottom-0 bg-white border-r border-gray-400 shadow-sm flex flex-col px-6 py-4 w-64 z-40 transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:flex`}>
+      <div
+        className={`fixed top-0 left-0 bottom-0 bg-white border-r border-gray-300 flex flex-col px-6 py-4 w-64 z-40 transition-transform duration-300 ease-in-out
+  ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:flex`}
+      >
         <div className="mb-4">
           <Image src="/planity_logo.png" alt="Logo Planity" width={220} height={80} />
         </div>
@@ -62,4 +72,5 @@ export default function Sidebar() {
     </>
   );
 }
+
 

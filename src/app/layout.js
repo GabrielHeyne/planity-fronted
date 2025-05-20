@@ -12,7 +12,7 @@ export default function RootLayout({ children }) {
       <body className="font-sans bg-white min-h-screen">
         <div className="flex min-h-screen">
           {/* Sidebar */}
-          <aside className="hidden md:flex flex-col w-64 h-screen fixed top-0 left-0 bg-white border-r border-gray-400 z-10">
+          <aside className="hidden md:flex flex-col w-64 h-screen fixed top-0 left-0 bg-white border-r border-gray-300 z-10">
             <Sidebar />
           </aside>
 
