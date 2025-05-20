@@ -1,5 +1,5 @@
 // src/utils/apiBase.js
-const ENTORNO = "dev"; // ⬅️ cambia a "prod" si necesitas (OK)
+const ENTORNO = "prod"; // ⬅️ cambia a "prod" si necesitas (OK)
 
 const URLS = {
   dev: "http://127.0.0.1:8001",
