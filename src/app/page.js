@@ -19,9 +19,19 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const yaHayDatos = sessionStorage.getItem("demanda_limpia");
-    if (yaHayDatos) setOrigen("manual");
-  }, []);
+  const yaHayDatos = sessionStorage.getItem("demanda_limpia");
+  if (yaHayDatos && yaHayDatos !== "undefined") {
+    try {
+      const parsed = JSON.parse(yaHayDatos);
+      if (Array.isArray(parsed)) {
+        setOrigen("manual");
+      }
+    } catch (e) {
+      console.warn("⚠️ Error parseando demanda_limpia en sessionStorage:", e);
+    }
+  }
+}, []);
+
 
   const handleArchivo = (e, tipo) => {
     const archivo = e.target.files[0];
@@ -282,13 +292,34 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
       if (!res.ok) throw new Error("Error al cargar desde la nube");
 
       const data = await res.json();
-      sessionStorage.setItem("demanda_limpia", JSON.stringify(data.demanda_limpia));
-      sessionStorage.setItem("forecast", JSON.stringify(data.forecast));
-      sessionStorage.setItem("maestro", JSON.stringify(data.maestro));
-      sessionStorage.setItem("reposiciones", JSON.stringify(data.reposiciones));
-      sessionStorage.setItem("stock_actual", JSON.stringify(data.stock_actual));
-      sessionStorage.setItem("stock_historico", JSON.stringify(data.stock_historico));
-      sessionStorage.setItem("stock_proyectado", JSON.stringify(data.stock_proyectado));
+
+if (!res.ok) {
+  throw new Error(data.error || "Error al cargar desde la nube");
+}
+
+// ✅ Guardar solo si existen
+if (data.demanda_limpia) {
+  sessionStorage.setItem("demanda_limpia", JSON.stringify(data.demanda_limpia));
+}
+if (data.forecast) {
+  sessionStorage.setItem("forecast", JSON.stringify(data.forecast));
+}
+if (data.maestro) {
+  sessionStorage.setItem("maestro", JSON.stringify(data.maestro));
+}
+if (data.reposiciones) {
+  sessionStorage.setItem("reposiciones", JSON.stringify(data.reposiciones));
+}
+if (data.stock_actual) {
+  sessionStorage.setItem("stock_actual", JSON.stringify(data.stock_actual));
+}
+if (data.stock_historico) {
+  sessionStorage.setItem("stock_historico", JSON.stringify(data.stock_historico));
+}
+if (data.stock_proyectado) {
+  sessionStorage.setItem("stock_proyectado", JSON.stringify(data.stock_proyectado));
+}
+
 
       toast.success("✅ Datos cargados desde la nube correctamente", {
         position: "top-center",
