@@ -241,40 +241,53 @@ export default function ProyeccionStockPage() {
 };
 
 
-  const chartPerdidasHistoricas = (() => {
-  const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
-  const preciosPorSku = maestro.reduce((acc, row) => {
-    acc[row.sku] = +row.precio_venta || 0;
-    return acc;
-  }, {});
+  const [chartPerdidasHistoricas, setChartPerdidasHistoricas] = useState({
+  labels: [],
+  datasets: [],
+});
 
-  const agrupado = demandaLimpia.reduce((acc, row) => {
-    const mes = row.fecha?.slice(0, 7);
-    const original = +row.demanda_original || 0;
-    const sinStockout = +row.demanda_sin_stockout || 0;
-    const perdida = Math.max(0, sinStockout - original);
-    const precioVenta = preciosPorSku[row.sku] || 0;
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    try {
+      const maestroRaw = sessionStorage.getItem("maestro");
+      const maestro = maestroRaw ? JSON.parse(maestroRaw) : [];
+      const preciosPorSku = maestro.reduce((acc, row) => {
+        acc[row.sku] = +row.precio_venta || 0;
+        return acc;
+      }, {});
 
-    if (!mes || isNaN(perdida) || !precioVenta) return acc;
+      const agrupado = demandaLimpia.reduce((acc, row) => {
+        const mes = row.fecha?.slice(0, 7);
+        const original = +row.demanda_original || 0;
+        const sinStockout = +row.demanda_sin_stockout || 0;
+        const perdida = Math.max(0, sinStockout - original);
+        const precioVenta = preciosPorSku[row.sku] || 0;
 
-    acc[mes] = (acc[mes] || 0) + perdida * precioVenta;
-    return acc;
-  }, {});
+        if (!mes || isNaN(perdida) || !precioVenta) return acc;
 
-  const labels = Object.keys(agrupado).sort();
-  const valores = labels.map((mes) => agrupado[mes]);
+        acc[mes] = (acc[mes] || 0) + perdida * precioVenta;
+        return acc;
+      }, {});
 
-  return {
-    labels,
-    datasets: [
-      {
-        label: "Pérdida Histórica (€)",
-        data: valores,
-        backgroundColor: "#ef4444",
-      },
-    ],
-  };
-})();
+      const labels = Object.keys(agrupado).sort();
+      const valores = labels.map((mes) => agrupado[mes]);
+
+      setChartPerdidasHistoricas({
+        labels,
+        datasets: [
+          {
+            label: "Pérdida Histórica (€)",
+            data: valores,
+            backgroundColor: "#ef4444",
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("❌ Error al procesar datos de pérdidas históricas:", error);
+    }
+  }
+}, [demandaLimpia]);
+
 
   // 🔝 Top 10 Pérdidas Proyectadas (ya existe)
 const top10Proyectadas = Object.entries(

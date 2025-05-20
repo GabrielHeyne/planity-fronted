@@ -186,30 +186,41 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
       </div>
 
       <div className="mt-10 text-sm text-gray-800 max-w-lg w-full flex flex-col items-center">
-        <p className="mb-4 font-medium text-center">Selecciona el origen de los datos:</p>
-        <div className="flex flex-row gap-6 justify-center">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="origen"
-              value="base"
-              checked={origen === "base"}
-              onChange={() => setOrigen("base")}
-            />
-            Desde Base de Datos
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="origen"
-              value="manual"
-              checked={origen === "manual"}
-              onChange={() => setOrigen("manual")}
-            />
-            Carga manual de archivos
-          </label>
-        </div>
-      </div>
+  <p className="mb-4 font-medium text-center">Selecciona el origen de los datos:</p>
+  <div className="flex flex-row gap-6 justify-center">
+    <label className="flex items-center gap-2">
+      <input
+        type="radio"
+        name="origen"
+        value="base"
+        checked={origen === "base"}
+        onChange={() => setOrigen("base")}
+      />
+      Desde Base de Datos
+    </label>
+    <label className="flex items-center gap-2">
+      <input
+        type="radio"
+        name="origen"
+        value="manual"
+        checked={origen === "manual"}
+        onChange={() => setOrigen("manual")}
+      />
+      Carga manual de archivos
+    </label>
+    <label className="flex items-center gap-2">
+      <input
+        type="radio"
+        name="origen"
+        value="cloud"
+        checked={origen === "cloud"}
+        onChange={() => setOrigen("cloud")}
+      />
+      Cargar desde la nube
+    </label>
+  </div>
+</div>
+
 
       {origen === "manual" && (
         <div className="mt-6 w-full max-w-2xl bg-gray-50 border border-gray-200 p-4 rounded-md shadow-sm">
@@ -249,27 +260,56 @@ sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio)
         }`}
         disabled={!origen || cargando}
         onClick={async () => {
-          if (origen === "manual") {
-            const faltantes = Object.entries(archivos)
-              .filter(([_, file]) => !file)
-              .map(([nombre]) => nombre);
+  if (origen === "manual") {
+    const faltantes = Object.entries(archivos)
+      .filter(([_, file]) => !file)
+      .map(([nombre]) => nombre);
 
-            if (faltantes.includes("demanda") || faltantes.includes("stockHistorico")) {
-              toast.warning("Faltan archivos requeridos: demanda y stock histórico", {
-                position: "top-center",
-              });
-              return;
-            }
+    if (faltantes.includes("demanda") || faltantes.includes("stockHistorico")) {
+      toast.warning("Faltan archivos requeridos: demanda y stock histórico", {
+        position: "top-center",
+      });
+      return;
+    }
 
-            await procesarArchivos();
-          }
+    await procesarArchivos();
+  }
 
-          if (origen === "base") {
-            toast.info("En futuras versiones se conectará a la base de datos.", {
-              position: "top-center",
-            });
-          }
-        }}
+  if (origen === "cloud") {
+    try {
+      setCargando(true);
+      const res = await fetch(`${API_BASE_URL}/cloud/cargar_desde_nube`);
+      if (!res.ok) throw new Error("Error al cargar desde la nube");
+
+      const data = await res.json();
+      sessionStorage.setItem("demanda_limpia", JSON.stringify(data.demanda_limpia));
+      sessionStorage.setItem("forecast", JSON.stringify(data.forecast));
+      sessionStorage.setItem("maestro", JSON.stringify(data.maestro));
+      sessionStorage.setItem("reposiciones", JSON.stringify(data.reposiciones));
+      sessionStorage.setItem("stock_actual", JSON.stringify(data.stock_actual));
+      sessionStorage.setItem("stock_historico", JSON.stringify(data.stock_historico));
+      sessionStorage.setItem("stock_proyectado", JSON.stringify(data.stock_proyectado));
+
+      toast.success("✅ Datos cargados desde la nube correctamente", {
+        position: "top-center",
+      });
+    } catch (err) {
+      console.error("❌ Error carga nube:", err);
+      toast.error("Error al cargar desde la nube", {
+        position: "top-center",
+      });
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  if (origen === "base") {
+    toast.info("En futuras versiones se conectará a la base de datos.", {
+      position: "top-center",
+    });
+  }
+}}
+
       >
         {cargando ? "Procesando..." : "🚀 Comenzar planificación"}
       </button>
