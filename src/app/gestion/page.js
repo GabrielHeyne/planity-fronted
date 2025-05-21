@@ -16,15 +16,17 @@ export default function GestionInventariosPage() {
   useEffect(() => {
     setIsLoading(true);
     try {
-      const cargado = sessionStorage.getItem("politicas_inventario");
+      const cargado = sessionStorage.getItem("tabla_resumen_visual");
       const detalleGuardado = sessionStorage.getItem("detalle_politicas");
 
       const resumenParsed = cargado && cargado !== "undefined" ? JSON.parse(cargado) : null;
       const detalleParsed = detalleGuardado && detalleGuardado !== "undefined" ? JSON.parse(detalleGuardado) : null;
+      const kpisParsed = JSON.parse(sessionStorage.getItem("kpis_inventario") || "null");
 
       if (resumenParsed && detalleParsed) {
         setResumen(resumenParsed);
         setDetalle(detalleParsed);
+        setKpis(kpisParsed || { total_skus: 0, total_unidades: 0, total_costo: 0 });
         setSkuSeleccionado(resumenParsed[0]?.SKU || "");
         setIsLoading(false);
         return;
@@ -65,8 +67,21 @@ export default function GestionInventariosPage() {
             setSkuSeleccionado(data.tabla_resumen[0].SKU);
           }
 
-          sessionStorage.setItem("politicas_inventario", JSON.stringify(data.tabla_resumen));
+          // ✅ Guardar tabla original para visualización
+          sessionStorage.setItem("tabla_resumen_visual", JSON.stringify(data.tabla_resumen));
           sessionStorage.setItem("detalle_politicas", JSON.stringify(data.detalles_por_sku));
+          sessionStorage.setItem("kpis_inventario", JSON.stringify(data.kpis));
+
+
+          // ✅ Guardar versión técnica esperada por backend
+          const politicasBackend = data.tabla_resumen.map((fila) => ({
+            sku: fila.SKU,
+            demanda_mensual: fila["Demanda Mensual"],
+            rop_original: fila.ROP,
+            eoq: fila.EOQ,
+            safety_stock: fila["Safety Stock"]
+          }));
+          sessionStorage.setItem("politicas_inventario", JSON.stringify(politicasBackend));
         })
         .catch((e) => {
           console.error("❌ Error al cargar políticas:", e);
@@ -204,8 +219,8 @@ export default function GestionInventariosPage() {
               value={skuSeleccionado}
               onChange={(e) => setSkuSeleccionado(e.target.value)}
             >
-              {[...new Set(resumen.map((r) => r.SKU))].sort().map((sku) => (
-                <option key={sku} value={sku}>
+              {[...new Set(resumen.map((r) => r.SKU).filter(Boolean))].sort().map((sku) => (
+                <option key={`option-${sku}`} value={sku}>
                   {sku}
                 </option>
               ))}
@@ -231,3 +246,5 @@ export default function GestionInventariosPage() {
     </div>
   );
 }
+
+
