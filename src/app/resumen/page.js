@@ -1,23 +1,48 @@
 "use client";
 import { useEffect, useState } from "react";
-import { PackageSearch, Download } from "lucide-react";
-import { saveAs } from "file-saver";
+import { Line } from "react-chartjs-2";
+import { PackageSearch } from "lucide-react";
+import dayjs from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+dayjs.extend(isSameOrAfter);
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend);
 
 export default function ResumenPage() {
   const [kpis, setKpis] = useState({});
   const [skuSeleccionado, setSkuSeleccionado] = useState("__TOTAL__");
   const [skusDisponibles, setSkusDisponibles] = useState([]);
+  const [graficos, setGraficos] = useState({
+  meses: [],
+  mesesForecast: [],
+  real: [],
+  limpia: [],
+  perdidas: [],
+  quiebre: [],
+  forecast: [],
+  forecastUp: [],
+  demandaLimpiaHistorica: [],
+  stockProyectado: [],
+  mesesProyeccion: [],
+  perdidasFuturas: [],
+  stockHistorico: [],
+  mesesStockHistorico: [],
 
-  const getUltimasSemanas = (n) => {
-    const hoy = new Date();
-    const semanas = [];
-    for (let i = 0; i < n; i++) {
-      const fecha = new Date(hoy);
-      fecha.setDate(hoy.getDate() - i * 7);
-      semanas.push(fecha.toISOString().slice(0, 10));
-    }
-    return semanas;
-  };
+});
+
+
+  const [fechaDesde, setFechaDesde] = useState(dayjs().subtract(12, "month").startOf("month").format("YYYY-MM-DD"));
+  const [fechaHasta, setFechaHasta] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
 
   useEffect(() => {
     const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
@@ -29,16 +54,18 @@ export default function ResumenPage() {
 
     const skus = [...new Set(demanda.map((r) => r.sku))];
     setSkusDisponibles(skus);
-    calcularKPIs("__TOTAL__", demanda, maestro, stockHist, detalle, repos);
-  }, []);
+
+    calcularKPIs(skuSeleccionado, demanda, maestro, stockHist, detalle, repos);
+    calcularGraficos(skuSeleccionado, demanda);
+  }, [skuSeleccionado, fechaDesde, fechaHasta]);
 
   const calcularKPIs = (sku, demanda, maestro, stockHist, detalle, repos) => {
-    const fechaLimite = new Date();
-    fechaLimite.setDate(fechaLimite.getDate() - 364); // 52 semanas
+    const desde = new Date(fechaDesde);
+    const hasta = new Date(fechaHasta);
 
     const demandaFiltrada = demanda.filter(d => {
       const fecha = new Date(d.semana);
-      return fecha >= fechaLimite && (sku === "__TOTAL__" || d.sku === sku);
+      return fecha >= desde && fecha <= hasta && (sku === "__TOTAL__" || d.sku === sku);
     });
 
     const maestroMap = Object.fromEntries(maestro.map(m => [m.sku, m.precio_venta]));
@@ -71,19 +98,14 @@ export default function ResumenPage() {
       ? forecastFiltrado.filter(f => meses.includes(f.mes)).reduce((a, b) => a + (b.demanda_limpia || 0), 0) / meses.length
       : 0;
 
-    const detalleFiltrado = sku === "__TOTAL__"
-      ? detalle
-      : detalle.filter(d => d.sku === sku);
-
+    const detalleFiltrado = sku === "__TOTAL__" ? detalle : detalle.filter(d => d.sku === sku);
     const stockActual = detalleFiltrado.reduce((a, b) => a + (b.stock_actual || 0), 0);
     const unidadesTransito = repos
       .filter(r => sku === "__TOTAL__" || r.sku === sku)
       .reduce((a, b) => a + (b.cantidad || 0), 0);
-
     const unidadesAComprar = detalleFiltrado
       .filter(d => d.accion === "Comprar")
       .reduce((a, b) => a + (b.unidades_sugeridas || 0), 0);
-
     const skusAComprar = sku === "__TOTAL__"
       ? [...new Set(detalle.filter(d => d.accion === "Comprar").map(d => d.sku))].length
       : detalleFiltrado.some(d => d.accion === "Comprar") ? 1 : 0;
@@ -102,22 +124,135 @@ export default function ResumenPage() {
     });
   };
 
-  const handleSelectSKU = (sku) => {
-    setSkuSeleccionado(sku);
-    const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
-    const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
-    const stockHist = JSON.parse(sessionStorage.getItem("stock_historico") || "[]");
-    const detalleObj = JSON.parse(sessionStorage.getItem("detalle_politicas") || "{}");
-    const detalle = Object.entries(detalleObj).map(([sku, vals]) => ({ sku, ...vals }));
-    const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
-    calcularKPIs(sku, demanda, maestro, stockHist, detalle, repos);
-  };
+  const calcularGraficos = (sku, demanda) => {
+    const desdeMes = dayjs(fechaDesde).format("YYYY-MM");
+    const resumen = {};
+const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
+const precios = Object.fromEntries(maestro.map(m => [m.sku, m.precio_venta || 0]));
 
-  const descargarCSV = () => {
-    const csv = Object.entries(kpis)
-      .map(([key, val]) => `${key},${val}`)
-      .join("\n");
-    saveAs(new Blob([csv], { type: "text/csv;charset=utf-8" }), "kpis_resumen.csv");
+    demanda
+      .filter((r) => {
+        const fecha = new Date(r.fecha);
+        return fecha >= new Date(fechaDesde) && fecha <= new Date(fechaHasta) && (sku === "__TOTAL__" || r.sku === sku);
+      })
+      .forEach((r) => {
+        const mes = dayjs(r.fecha).format("YYYY-MM");
+        if (!resumen[mes]) resumen[mes] = { real: 0, limpia: 0, perdidas: 0 };
+        const real = Number(r.demanda_original || 0);
+        const limpia = Number(r.demanda_sin_outlier || 0);
+        resumen[mes].real += real;
+resumen[mes].limpia += limpia;
+const perdida = Math.max(0, limpia - real);
+resumen[mes].perdidas += perdida;
+resumen[mes].perdidas_euros = (resumen[mes].perdidas_euros || 0) + (perdida * (precios[r.sku] || 0));
+
+      });
+
+    const meses = Object.keys(resumen).sort();
+    const real = meses.map(m => resumen[m].real);
+    const limpia = meses.map(m => resumen[m].limpia);
+    const perdidas = meses.map(m => resumen[m].perdidas_euros || 0);
+    const quiebre = meses.map(m =>
+      resumen[m].limpia > 0 ? (resumen[m].perdidas / resumen[m].limpia) * 100 : 0
+    );
+
+    const forecast = JSON.parse(sessionStorage.getItem("forecast") || "[]");
+    const stockProy = JSON.parse(sessionStorage.getItem("stock_proyectado") || "[]");
+
+    const forecastHistorico = forecast
+      .filter(f => f.tipo_mes === "histórico" && (sku === "__TOTAL__" || f.sku === sku))
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    const forecastProyeccion = forecast
+      .filter(f => f.tipo_mes === "proyección" && (sku === "__TOTAL__" || f.sku === sku))
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    const mesesForecast = [
+      ...new Set([
+        ...forecastHistorico.map(f => f.mes),
+        ...forecastProyeccion.map(f => f.mes)
+      ])
+    ].filter(m => m >= desdeMes).sort();
+
+    const demandaLimpiaHistorica = mesesForecast.map(m =>
+      forecastHistorico.some(f => f.mes === m)
+        ? forecastHistorico.filter(f => f.mes === m).reduce((s, f) => s + (f.demanda_limpia || 0), 0)
+        : null
+    );
+
+    const forecastValores = mesesForecast.map(m =>
+      forecastProyeccion.some(f => f.mes === m)
+        ? forecastProyeccion.filter(f => f.mes === m).reduce((s, f) => s + (f.forecast || 0), 0)
+        : null
+    );
+
+    const forecastValoresUp = mesesForecast.map(m =>
+  forecastProyeccion.some(f => f.mes === m)
+    ? forecastProyeccion.filter(f => f.mes === m).reduce((s, f) => s + (f.forecast_up || 0), 0)
+    : null
+);
+
+
+    const stockProyectadoFiltrado = stockProy
+      .filter(f => {
+        const fechaMes = dayjs(f.mes + "-01");
+        return (sku === "__TOTAL__" || f.sku === sku) && fechaMes.isSameOrAfter(dayjs(desdeMes));
+      })
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    // Agrupar por mes
+const agrupado = {};
+stockProyectadoFiltrado.forEach(f => {
+  if (!agrupado[f.mes]) {
+    agrupado[f.mes] = { stock: 0, perdida: 0 };
+  }
+  agrupado[f.mes].stock += f.stock_final_mes || 0;
+  agrupado[f.mes].perdida += f.perdida_proyectada_euros || 0;
+});
+
+const mesesProyeccion = Object.keys(agrupado).sort();
+const stockProyValores = mesesProyeccion.map(m => agrupado[m].stock);
+const perdidasFuturas = mesesProyeccion.map(m => agrupado[m].perdida);
+
+const stockHist = JSON.parse(sessionStorage.getItem("stock_historico") || "[]");
+
+const desde = new Date(fechaDesde);
+const hasta = new Date(fechaHasta);
+
+const stockHistoricoFiltrado = stockHist.filter(s => {
+  const fecha = new Date(s.fecha);
+  return (sku === "__TOTAL__" || s.sku === sku) && fecha >= desde && fecha <= hasta;
+});
+
+const stockPorMes = {};
+stockHistoricoFiltrado.forEach(s => {
+  const mes = dayjs(s.fecha).format("YYYY-MM");
+  if (!stockPorMes[mes]) stockPorMes[mes] = 0;
+  stockPorMes[mes] += s.stock || 0;
+});
+
+const mesesStockHistorico = Object.keys(stockPorMes).sort();
+const stockHistorico = mesesStockHistorico.map(m => stockPorMes[m]);
+
+
+
+    setGraficos({
+  meses,
+  mesesForecast,
+  real,
+  limpia,
+  perdidas,
+  quiebre,
+  forecast: forecastValores,
+  forecastUp: forecastValoresUp,
+  demandaLimpiaHistorica,
+  stockProyectado: stockProyValores,
+  mesesProyeccion,
+  stockHistorico,
+  mesesStockHistorico,
+  perdidasFuturas
+});
+
   };
 
   return (
@@ -127,42 +262,92 @@ export default function ResumenPage() {
         Resumen General
       </h1>
 
-      <div className="max-w-sm">
-        <label className="block text-sm mb-1 text-gray-600">Selecciona un SKU:</label>
-        <select
-          value={skuSeleccionado}
-          onChange={(e) => handleSelectSKU(e.target.value)}
-          className="border px-4 py-2 rounded shadow-sm w-full"
-        >
-          <option value="__TOTAL__">Todos los SKUs</option>
-          {skusDisponibles.map((sku) => (
-            <option key={sku} value={sku}>{sku}</option>
-          ))}
-        </select>
-      </div>
+      {/* Selectores */}
+      <div className="flex flex-col md:flex-row gap-4">
+  <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 w-full md:w-64 shadow-sm">
+    <label className="block text-xs text-gray-500 mb-1">Selecciona un SKU</label>
+    <select
+      value={skuSeleccionado}
+      onChange={(e) => setSkuSeleccionado(e.target.value)}
+      className="w-full bg-white border border-gray-300 text-sm px-3 py-2 rounded shadow-inner"
+    >
+      <option value="__TOTAL__">Todos los SKUs</option>
+      {skusDisponibles.map((sku) => (
+        <option key={sku} value={sku}>{sku}</option>
+      ))}
+    </select>
+  </div>
 
+  <div className="flex flex-1 gap-4">
+    <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 flex-1 shadow-sm">
+      <label className="block text-xs text-gray-500 mb-1">Desde</label>
+      <input
+        type="date"
+        value={fechaDesde}
+        onChange={(e) => setFechaDesde(e.target.value)}
+        className="w-full bg-white border border-gray-300 text-sm px-3 py-2 rounded shadow-inner"
+      />
+    </div>
+
+    <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 flex-1 shadow-sm">
+      <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+      <input
+        type="date"
+        value={fechaHasta}
+        onChange={(e) => setFechaHasta(e.target.value)}
+        className="w-full bg-white border border-gray-300 text-sm px-3 py-2 rounded shadow-inner"
+      />
+    </div>
+  </div>
+</div>
+
+
+      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
         <KpiCard label="Stock Actual" value={kpis.stockActual?.toLocaleString("es-CL")} />
-<KpiCard label="Unid. Vendidas (12M)" value={kpis.ventas12m?.toLocaleString("es-CL")} />
-<KpiCard label="Facturación (12M)" value={`€ ${kpis.facturacion?.toLocaleString("es-CL")}`} />
-<KpiCard label="Unid. en Tránsito" value={kpis.unidadesTransito?.toLocaleString("es-CL")} />
-<KpiCard label="SKUs a Comprar" value={kpis.skusAComprar?.toLocaleString("es-CL")} />
-<KpiCard label="Unidades Perdidas (12M)" value={kpis.perdidas12m?.toLocaleString("es-CL")} rojo />
-<KpiCard label="Venta Perdida (12M)" value={`€ ${kpis.ventaPerdida?.toLocaleString("es-CL")}`} rojo />
-<KpiCard label="Demanda Mensual (3M)" value={kpis.demandaMensual?.toLocaleString("es-CL")} />
-<KpiCard label="Tasa de Quiebre" value={`${kpis.tasaQuiebre}%`} />
-<KpiCard label="Unidades a Comprar" value={kpis.unidadesAComprar?.toLocaleString("es-CL")} />
-
+        <KpiCard label="Unid. Vendidas (12M)" value={kpis.ventas12m?.toLocaleString("es-CL")} />
+        <KpiCard label="Facturación (12M)" value={`€ ${kpis.facturacion?.toLocaleString("es-CL")}`} />
+        <KpiCard label="Unid. en Tránsito" value={kpis.unidadesTransito?.toLocaleString("es-CL")} />
+        <KpiCard label="SKUs a Comprar" value={kpis.skusAComprar?.toLocaleString("es-CL")} />
+        <KpiCard label="Unidades Perdidas (12M)" value={kpis.perdidas12m?.toLocaleString("es-CL")} rojo />
+        <KpiCard label="Venta Perdida (12M)" value={`€ ${kpis.ventaPerdida?.toLocaleString("es-CL")}`} rojo />
+        <KpiCard label="Demanda Mensual (3M)" value={kpis.demandaMensual?.toLocaleString("es-CL")} />
+        <KpiCard label="Tasa de Quiebre" value={`${kpis.tasaQuiebre}%`} />
+        <KpiCard label="Unidades a Comprar" value={kpis.unidadesAComprar?.toLocaleString("es-CL")} />
       </div>
 
-      <div className="flex justify-end mt-6">
-        <button
-          onClick={descargarCSV}
-          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-        >
-          <Download className="w-4 h-4" />
-          Descargar CSV
-        </button>
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
+  <ChartCard title="📈 Demanda mensual: real vs limpia" datasets={[
+    { label: "Demanda Real", data: graficos.real, borderColor: "#3b82f6" },
+    { label: "Demanda Limpia", data: graficos.limpia, borderColor: "#22c55e" }
+  ]} labels={graficos.meses} />
+
+  <ChartCard title="📦 Stock histórico mensual" datasets={[
+    { label: "Stock Histórico", data: graficos.stockHistorico, borderColor: "#a78bfa" }
+  ]} labels={graficos.mesesStockHistorico} />
+
+  <ChartCard title="💸 Venta Perdida por mes (€)" datasets={[
+  { label: "Venta Perdida", data: graficos.perdidas, borderColor: "#ef4444" }
+]} labels={graficos.meses} />
+
+
+
+        <ChartCard title="🔄 Forecast vs Demanda Limpia" datasets={[
+  { label: "Forecast", data: graficos.forecast, borderColor: "#0ea5e9" },
+  { label: "Forecast + Margen", data: graficos.forecastUp, borderColor: "#8b5cf6" },
+  { label: "Demanda Limpia", data: graficos.demandaLimpiaHistorica, borderColor: "#16a34a" }
+]} labels={graficos.mesesForecast} />
+
+
+        <ChartCard title="📦 Stock Proyectado" datasets={[
+  { label: "Stock Proyectado", data: graficos.stockProyectado, borderColor: "#a855f7" }
+]} labels={graficos.mesesProyeccion} />
+
+<ChartCard title="💸 Pérdidas Proyectadas (€)" datasets={[
+  { label: "Pérdidas Futuras", data: graficos.perdidasFuturas, borderColor: "#f97316" }
+]} labels={graficos.mesesProyeccion} />
+
       </div>
     </div>
   );
@@ -173,12 +358,41 @@ function KpiCard({ label, value, rojo = false }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center shadow-sm">
       <p className="text-xs text-gray-500">{label}</p>
-      <p className={`text-xl font-semibold ${color}`}>
-        {value ?? "-"}
-      </p>
+      <p className={`text-xl font-semibold ${color}`}>{value ?? "-"}</p>
     </div>
   );
 }
+
+function ChartCard({ title, datasets, labels, options = {} }) {
+  return (
+    <div className="bg-white shadow rounded-lg p-4">
+      <h2 className="text-sm text-center mb-2 font-medium text-gray-700">{title}</h2>
+      <Line
+        data={{ labels, datasets }}
+        options={{
+          responsive: true,
+          plugins: { legend: { position: "bottom" } },
+          ...options
+        }}
+      />
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

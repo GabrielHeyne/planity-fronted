@@ -8,12 +8,10 @@ import {
   PointElement,
   LineElement,
   BarElement,
-  BarController, // ✅ necesario
   Tooltip,
   Legend,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { API_BASE_URL } from "@/utils/apiBase";
 
 ChartJS.register(
   CategoryScale,
@@ -21,7 +19,6 @@ ChartJS.register(
   PointElement,
   LineElement,
   BarElement,
-  BarController, // ✅ importante
   Tooltip,
   Legend
 );
@@ -29,61 +26,71 @@ ChartJS.register(
 export default function ForecastPage() {
   const [forecastData, setForecastData] = useState([]);
   const [skuSeleccionado, setSkuSeleccionado] = useState("");
+  const [kpis, setKpis] = useState({
+    forecastProm: 0,
+    forecastUpProm: 0,
+    metodo: "-"
+  });
 
   useEffect(() => {
-  const forecastGuardado = sessionStorage.getItem("forecast");
+    const forecastGuardado = sessionStorage.getItem("forecast");
+    if (forecastGuardado) {
+      const parsed = JSON.parse(forecastGuardado);
+      setForecastData(parsed);
+      if (!skuSeleccionado && parsed.length > 0) {
+        setSkuSeleccionado(parsed[0].sku);
+      } else {
+        calcularKPIs(parsed);
+      }
+    }
+  }, [skuSeleccionado]);
 
-  if (forecastGuardado) {
-    console.log("⚡️ Forecast ya disponible en sesión.");
-    const parsed = JSON.parse(forecastGuardado);
-    setForecastData(parsed);
-    if (parsed.length > 0) setSkuSeleccionado(parsed[0].sku);
-    return;
-  }
+  const calcularKPIs = (datos) => {
+    const filtrado = datos.filter(
+      (r) =>
+        r.tipo_mes === "proyección" &&
+        (skuSeleccionado === "" || r.sku === skuSeleccionado)
+    );
+    const forecastProm =
+      filtrado.slice(0, 3).reduce((sum, r) => sum + (r.forecast || 0), 0) / 3;
+    const forecastUpProm =
+      filtrado.slice(0, 3).reduce((sum, r) => sum + (r.forecast_up || 0), 0) / 3;
+    const metodo = filtrado[0]?.metodo_forecast || "-";
 
-  const stored = sessionStorage.getItem("demanda_limpia");
-  if (stored) {
-    const demanda = JSON.parse(stored);
-
-    const datosForecast = demanda.map((fila) => ({
-      sku: fila.sku,
-      fecha: fila.fecha,
-      demanda: fila.demanda ?? fila.demanda_sin_outlier ?? 0,
-      demanda_sin_outlier: fila.demanda_sin_outlier ?? fila.demanda ?? 0,
-    }));
-
-    fetch(`${API_BASE_URL}/forecast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosForecast),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        const resultado = data.forecast || [];
-        sessionStorage.setItem("forecast", JSON.stringify(resultado));
-        setForecastData(resultado);
-        if (resultado.length > 0) setSkuSeleccionado(resultado[0].sku);
-      })
-      .catch((err) => console.error("❌ Error al obtener forecast:", err));
-  }
-}, []);
+    setKpis({
+      forecastProm: Math.round(forecastProm),
+      forecastUpProm: Math.round(forecastUpProm),
+      metodo
+    });
+  };
 
   if (!forecastData.length) {
-    return <div className="p-6 text-gray-500 text-sm">No hay datos de forecast disponibles.</div>;
+    return (
+      <div className="p-6 text-gray-500 text-sm">
+        No hay datos de forecast disponibles.
+      </div>
+    );
   }
 
   const dataFiltrada = forecastData.filter((r) => r.sku === skuSeleccionado);
 
   const labels = dataFiltrada.map((d) =>
-    new Date(d.mes).toLocaleDateString("es-CL", { month: "short", year: "numeric" })
+    new Date(d.mes).toLocaleDateString("es-CL", {
+      month: "short",
+      year: "numeric",
+    })
   );
 
-  const demandaLimpia = dataFiltrada.map((d) => Number(d.demanda_limpia) || 0);
-  const forecast = dataFiltrada.map((d) =>
-    d.tipo_mes !== "histórico" ? Number(d.forecast) || null : null
+  const demandaLimpia = dataFiltrada.map((d) =>
+    d.tipo_mes === "histórico" ? Number(d.demanda_limpia) : null
   );
+
+  const forecast = dataFiltrada.map((d) =>
+    d.tipo_mes === "proyección" ? Number(d.forecast) : null
+  );
+
   const forecastUp = dataFiltrada.map((d) =>
-    d.tipo_mes === "proyección" ? Number(d.forecast_up) || null : null
+    d.tipo_mes === "proyección" ? Number(d.forecast_up) : null
   );
 
   return (
@@ -93,7 +100,8 @@ export default function ForecastPage() {
         <h1 className="text-2xl font-semibold text-gray-800">Forecast por SKU</h1>
       </div>
 
-      <div className="mb-6 max-w-sm">
+      {/* Filtro SKU */}
+      <div className="mb-4 max-w-sm">
         <label className="block text-sm text-gray-600 mb-1">Filtrar por SKU:</label>
         <select
           className="w-full border border-gray-300 rounded px-3 py-1 text-sm"
@@ -108,6 +116,14 @@ export default function ForecastPage() {
         </select>
       </div>
 
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard label="Forecast Promedio (3M)" value={kpis.forecastProm} />
+        <KpiCard label="Forecast + Margen (3M)" value={kpis.forecastUpProm} />
+        <KpiCard label="Método Seleccionado" value={kpis.metodo} />
+      </div>
+
+      {/* Gráfico */}
       <div className="bg-white p-4 rounded shadow">
         <h2 className="text-sm text-center mb-2 flex items-center justify-center gap-2">
           <CalendarClock className="w-4 h-4" /> Forecast vs Demanda
@@ -120,7 +136,7 @@ export default function ForecastPage() {
                 type: "bar",
                 label: "Demanda Limpia",
                 data: demandaLimpia,
-                backgroundColor: "rgba(37, 99, 235, 0.8)",
+                backgroundColor: "#3b82f6",
                 borderRadius: 4,
                 borderSkipped: false,
               },
@@ -128,10 +144,10 @@ export default function ForecastPage() {
                 type: "line",
                 label: "Forecast proyectado",
                 data: forecast,
-                borderColor: "#16a34a",
+                borderColor: "#22c55e",
                 borderWidth: 2,
                 pointRadius: 4,
-                pointBackgroundColor: "#16a34a",
+                pointBackgroundColor: "#22c55e",
                 tension: 0.3,
               },
               {
@@ -160,7 +176,8 @@ export default function ForecastPage() {
               },
               tooltip: {
                 callbacks: {
-                  label: (ctx) => `${ctx.dataset.label}: ${ctx.formattedValue} unidades`,
+                  label: (ctx) =>
+                    `${ctx.dataset.label}: ${ctx.formattedValue} unidades`,
                 },
               },
             },
@@ -178,6 +195,7 @@ export default function ForecastPage() {
         />
       </div>
 
+      {/* Tabla de resumen */}
       <div className="bg-white p-4 rounded shadow">
         <h3 className="text-sm mb-3">Resumen de forecast</h3>
         <table className="w-full text-sm text-center table-auto">
@@ -200,7 +218,7 @@ export default function ForecastPage() {
                 <td className="py-1">{r.mes}</td>
                 <td className="py-1">{r.demanda ?? "-"}</td>
                 <td className="py-1">{r.demanda_limpia ?? "-"}</td>
-                <td className="py-1 font-medium">{r.forecast}</td>
+                <td className="py-1 font-medium">{r.forecast ?? "-"}</td>
                 <td className="py-1 text-green-600">{r.forecast_up ?? "-"}</td>
                 <td className="py-1 text-indigo-600">{r.dpa_movil ?? "-"}</td>
                 <td className="py-1 text-gray-500">{r.tipo_mes}</td>
@@ -212,6 +230,20 @@ export default function ForecastPage() {
     </div>
   );
 }
+
+function KpiCard({ label, value }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center shadow-sm">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xl font-semibold text-gray-800">{value ?? "-"}</p>
+    </div>
+  );
+}
+
+
+
+
+
 
 
 
