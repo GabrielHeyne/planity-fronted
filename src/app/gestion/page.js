@@ -14,86 +14,99 @@ export default function GestionInventariosPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setIsLoading(true);
-    try {
-      const cargado = sessionStorage.getItem("tabla_resumen_visual");
-      const detalleGuardado = sessionStorage.getItem("detalle_politicas");
+  setIsLoading(true);
+  try {
+    const cargado = sessionStorage.getItem("tabla_resumen_visual");
+    const detalleGuardado = sessionStorage.getItem("detalle_politicas");
 
-      const resumenParsed = cargado && cargado !== "undefined" ? JSON.parse(cargado) : null;
-      const detalleParsed = detalleGuardado && detalleGuardado !== "undefined" ? JSON.parse(detalleGuardado) : null;
-      const kpisParsed = JSON.parse(sessionStorage.getItem("kpis_inventario") || "null");
+    const resumenParsed = cargado && cargado !== "undefined" ? JSON.parse(cargado) : null;
+    const detalleParsed = detalleGuardado && detalleGuardado !== "undefined" ? JSON.parse(detalleGuardado) : null;
+    const kpisParsed = JSON.parse(sessionStorage.getItem("kpis_inventario") || "null");
 
-      if (resumenParsed && detalleParsed) {
-        setResumen(resumenParsed);
-        setDetalle(detalleParsed);
-        setKpis(kpisParsed || { total_skus: 0, total_unidades: 0, total_costo: 0 });
-        setSkuSeleccionado(resumenParsed[0]?.SKU || "");
-        setIsLoading(false);
-        return;
-      }
-    } catch (e) {
-      console.error("❌ Error al leer desde sessionStorage:", e);
-      sessionStorage.removeItem("politicas_inventario");
-      sessionStorage.removeItem("detalle_politicas");
-    }
-
-    try {
-      const forecast = JSON.parse(sessionStorage.getItem("forecast") || "[]");
-      const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
-      const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
-      const stock = JSON.parse(sessionStorage.getItem("stock_actual") || "[]");
-      const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
-
-      if (!forecast.length || !maestro.length || !demanda.length || !stock.length) {
-        setError("⚠️ Faltan datos esenciales para calcular inventario.");
-        setIsLoading(false);
-        return;
-      }
-
-      fetch(`${API_BASE_URL}/gestion_inventario`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forecast, maestro, demanda_limpia: demanda, stock_actual: stock, reposiciones: repos }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.error) throw new Error(data.error);
-
-          setResumen(data.tabla_resumen || []);
-          setDetalle(data.detalles_por_sku || {});
-          setKpis(data.kpis || { total_skus: 0, total_unidades: 0, total_costo: 0 });
-
-          if (data.tabla_resumen?.length > 0) {
-            setSkuSeleccionado(data.tabla_resumen[0].SKU);
-          }
-
-          // ✅ Guardar tabla original para visualización
-          sessionStorage.setItem("tabla_resumen_visual", JSON.stringify(data.tabla_resumen));
-          sessionStorage.setItem("detalle_politicas", JSON.stringify(data.detalles_por_sku));
-          sessionStorage.setItem("kpis_inventario", JSON.stringify(data.kpis));
-
-
-          // ✅ Guardar versión técnica esperada por backend
-          const politicasBackend = data.tabla_resumen.map((fila) => ({
-            sku: fila.SKU,
-            demanda_mensual: fila["Demanda Mensual"],
-            rop_original: fila.ROP,
-            eoq: fila.EOQ,
-            safety_stock: fila["Safety Stock"]
-          }));
-          sessionStorage.setItem("politicas_inventario", JSON.stringify(politicasBackend));
-        })
-        .catch((e) => {
-          console.error("❌ Error al cargar políticas:", e);
-          setError("❌ Error al cargar los datos del inventario.");
-        })
-        .finally(() => setIsLoading(false));
-    } catch (e) {
-      console.error("❌ Error leyendo datos desde sessionStorage:", e);
-      setError("❌ Error al procesar los datos locales.");
+    if (resumenParsed && detalleParsed) {
+      setResumen(resumenParsed);
+      setDetalle(detalleParsed);
+      setKpis(kpisParsed || { total_skus: 0, total_unidades: 0, total_costo: 0 });
+      setSkuSeleccionado(resumenParsed[0]?.SKU || "");
       setIsLoading(false);
+      return;
     }
-  }, []);
+  } catch (e) {
+    console.error("❌ Error al leer desde sessionStorage:", e);
+    sessionStorage.removeItem("politicas_inventario");
+    sessionStorage.removeItem("detalle_politicas");
+  }
+
+  try {
+    const forecast = JSON.parse(sessionStorage.getItem("forecast") || "[]");
+    const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
+    const stock = JSON.parse(sessionStorage.getItem("stock_actual") || "[]");
+    const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
+
+    if (!forecast.length || !maestro.length || !stock.length) {
+      setError("⚠️ Faltan datos esenciales para calcular inventario.");
+      setIsLoading(false);
+      return;
+    }
+
+    fetch(`${API_BASE_URL}/cloud/demanda_limpia`)
+      .then((res) => res.json())
+      .then((demanda) => {
+        if (!demanda.length) {
+          setError("⚠️ No se pudo cargar la demanda limpia desde el backend.");
+          setIsLoading(false);
+          return;
+        }
+
+        fetch(`${API_BASE_URL}/gestion_inventario`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ forecast, maestro, demanda_limpia: demanda, stock_actual: stock, reposiciones: repos }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) throw new Error(data.error);
+
+            setResumen(data.tabla_resumen || []);
+            setDetalle(data.detalles_por_sku || {});
+            setKpis(data.kpis || { total_skus: 0, total_unidades: 0, total_costo: 0 });
+
+            if (data.tabla_resumen?.length > 0) {
+              setSkuSeleccionado(data.tabla_resumen[0].SKU);
+            }
+
+            // ✅ Guardar tabla original para visualización
+            sessionStorage.setItem("tabla_resumen_visual", JSON.stringify(data.tabla_resumen));
+            sessionStorage.setItem("detalle_politicas", JSON.stringify(data.detalles_por_sku));
+            sessionStorage.setItem("kpis_inventario", JSON.stringify(data.kpis));
+
+            // ✅ Guardar versión técnica esperada por backend
+            const politicasBackend = data.tabla_resumen.map((fila) => ({
+              sku: fila.SKU,
+              demanda_mensual: fila["Demanda Mensual"],
+              rop_original: fila.ROP,
+              eoq: fila.EOQ,
+              safety_stock: fila["Safety Stock"]
+            }));
+            sessionStorage.setItem("politicas_inventario", JSON.stringify(politicasBackend));
+          })
+          .catch((e) => {
+            console.error("❌ Error al cargar políticas:", e);
+            setError("❌ Error al cargar los datos del inventario.");
+          })
+          .finally(() => setIsLoading(false));
+      })
+      .catch((e) => {
+        console.error("❌ Error al obtener demanda limpia:", e);
+        setError("❌ No se pudo obtener la demanda limpia desde el backend.");
+        setIsLoading(false);
+      });
+  } catch (e) {
+    console.error("❌ Error leyendo datos desde sessionStorage:", e);
+    setError("❌ Error al procesar los datos locales.");
+    setIsLoading(false);
+  }
+}, []);
 
   const resumenFiltrado =
     filtroAccion === "Todos"

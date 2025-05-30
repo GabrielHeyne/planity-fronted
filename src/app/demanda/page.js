@@ -5,6 +5,7 @@ import isBetween from "dayjs/plugin/isBetween";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { saveAs } from "file-saver";
+import { API_BASE_URL } from "@/utils/apiBase"; 
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -35,24 +36,29 @@ export default function DemandaTotal() {
   const [fechaInicio, setFechaInicio] = useState(dayjs().subtract(12, "month").toDate());
   const [fechaFin, setFechaFin] = useState(new Date());
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem("demanda_limpia");
-    if (stored) {
-      try {
-        setData(JSON.parse(stored));
-      } catch (e) {
-        console.error("Error parsing sessionStorage:", e);
-      }
-    }
 
-    const skuGuardado = sessionStorage.getItem("filtro_sku");
-    const fechaIniGuardada = sessionStorage.getItem("filtro_fecha_inicio");
-    const fechaFinGuardada = sessionStorage.getItem("filtro_fecha_fin");
+useEffect(() => {
+  // Cargar demanda limpia desde backend
+  fetch(`${API_BASE_URL}/cloud/demanda_limpia`)
+    .then((res) => res.json())
+    .then((json) => {
+      if (!Array.isArray(json)) throw new Error("Respuesta inválida");
+      setData(json);
+    })
+    .catch((err) => {
+      console.error("❌ Error al cargar demanda limpia:", err);
+    });
 
-    if (skuGuardado) setSkuSeleccionado(skuGuardado);
-    if (fechaIniGuardada) setFechaInicio(new Date(fechaIniGuardada));
-    if (fechaFinGuardada) setFechaFin(new Date(fechaFinGuardada));
-  }, []);
+  // Mantener filtros si estaban guardados
+  const skuGuardado = sessionStorage.getItem("filtro_sku");
+  const fechaIniGuardada = sessionStorage.getItem("filtro_fecha_inicio");
+  const fechaFinGuardada = sessionStorage.getItem("filtro_fecha_fin");
+
+  if (skuGuardado) setSkuSeleccionado(skuGuardado);
+  if (fechaIniGuardada) setFechaInicio(new Date(fechaIniGuardada));
+  if (fechaFinGuardada) setFechaFin(new Date(fechaFinGuardada));
+}, []);
+
 
   const handleSelectSKU = (sku) => {
     setSkuSeleccionado(sku);

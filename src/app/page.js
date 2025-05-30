@@ -85,7 +85,7 @@ export default function Home() {
       if (!response.ok) throw new Error("Error al limpiar la demanda");
 
       const demandaLimpia = await response.json();
-      sessionStorage.setItem("demanda_limpia", JSON.stringify(demandaLimpia));
+      
 
       const datosForecast = demandaLimpia.map((fila) => ({
         sku: fila.sku,
@@ -287,9 +287,7 @@ if (!res.ok) {
 }
 
 // ✅ Guardar solo si existen
-if (data.demanda_limpia) {
-  sessionStorage.setItem("demanda_limpia", JSON.stringify(data.demanda_limpia));
-}
+
 if (data.forecast) {
   sessionStorage.setItem("forecast", JSON.stringify(data.forecast));
 }

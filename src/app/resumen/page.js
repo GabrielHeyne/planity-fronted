@@ -64,19 +64,28 @@ useEffect(() => {
 
 // 🔁 useEffect 2: calcular KPIs y gráficos cada vez que cambien filtros o stock
 useEffect(() => {
-  const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
-  const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
-  const detalleObj = JSON.parse(sessionStorage.getItem("detalle_politicas") || "{}");
-  const detalle = Object.entries(detalleObj).map(([sku, vals]) => ({ sku, ...vals }));
-  const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
+  async function fetchYCalcular() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cloud/demanda_limpia`);
+      const demanda = await res.json();
 
-  const skus = [...new Set(demanda.map((r) => r.sku))];
-  setSkusDisponibles(skus);
+      const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
+      const detalleObj = JSON.parse(sessionStorage.getItem("detalle_politicas") || "{}");
+      const detalle = Object.entries(detalleObj).map(([sku, vals]) => ({ sku, ...vals }));
+      const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
 
-  calcularKPIs(skuSeleccionado, demanda, maestro, stockHist, detalle, repos);
-  calcularGraficos(skuSeleccionado, demanda);
+      const skus = [...new Set(demanda.map((r) => r.sku))];
+      setSkusDisponibles(skus);
+
+      calcularKPIs(skuSeleccionado, demanda, maestro, stockHist, detalle, repos);
+      calcularGraficos(skuSeleccionado, demanda);
+    } catch (error) {
+      console.error("❌ Error al cargar demanda limpia:", error);
+    }
+  }
+
+  fetchYCalcular();
 }, [skuSeleccionado, fechaDesde, fechaHasta, stockHist]);
-
 
     const calcularKPIs = (sku, demanda, maestro, stockHist, detalle, repos) => {
     const desde = new Date(fechaDesde);

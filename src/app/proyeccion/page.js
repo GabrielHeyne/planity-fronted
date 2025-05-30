@@ -42,36 +42,45 @@ export default function ProyeccionStockPage() {
   const [demandaLimpia, setDemandaLimpia] = useState([]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const almacenado = sessionStorage.getItem("stock_proyectado");
-      const demanda = sessionStorage.getItem("demanda_limpia");
+  if (typeof window !== "undefined") {
+    const almacenado = sessionStorage.getItem("stock_proyectado");
+    if (almacenado) setData(JSON.parse(almacenado));
+  }
 
-      if (almacenado) setData(JSON.parse(almacenado));
-      if (demanda) setDemandaLimpia(JSON.parse(demanda));
+  const fetchStockHist = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cloud/stock_historico`);
+      const data = await res.json();
+      setStockHist(data);
+    } catch (err) {
+      console.error("❌ Error al obtener stock histórico desde backend:", err);
+      setStockHist([]);
     }
+  };
 
-    const fetchStockHist = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/cloud/stock_historico`);
-        const data = await res.json();
-        setStockHist(data);
-      } catch (err) {
-        console.error("❌ Error al obtener stock histórico desde backend:", err);
-        setStockHist([]);
-      }
-    };
-
-    fetchStockHist();
-  }, []);
-
-  useEffect(() => {
-    if (!data.length) return;
-    if (skuSeleccionado === "__TOTAL__") {
-      setFiltrado(data);
-    } else {
-      setFiltrado(data.filter((d) => d.sku === skuSeleccionado));
+  const fetchDemandaLimpia = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cloud/demanda_limpia`);
+      const data = await res.json();
+      setDemandaLimpia(data);
+    } catch (err) {
+      console.error("❌ Error al obtener demanda limpia desde backend:", err);
+      setDemandaLimpia([]);
     }
-  }, [skuSeleccionado, data]);
+  };
+
+  fetchStockHist();
+  fetchDemandaLimpia();
+}, []);
+
+useEffect(() => {
+  if (!data.length) return;
+  if (skuSeleccionado === "__TOTAL__") {
+    setFiltrado(data);
+  } else {
+    setFiltrado(data.filter((d) => d.sku === skuSeleccionado));
+  }
+}, [skuSeleccionado, data]);
 
   const exportarCSV = () => {
     if (!filtrado.length) return;
