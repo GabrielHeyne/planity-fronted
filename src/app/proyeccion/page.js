@@ -21,6 +21,7 @@ import { saveAs } from "file-saver";
 import { PackageSearch } from "lucide-react";
 import { History } from "lucide-react";
 import { Activity } from "lucide-react";
+import { API_BASE_URL } from "@/utils/apiBase";
 
 
 ChartJS.register(
@@ -43,13 +44,24 @@ export default function ProyeccionStockPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const almacenado = sessionStorage.getItem("stock_proyectado");
-      const historico = sessionStorage.getItem("stock_historico");
       const demanda = sessionStorage.getItem("demanda_limpia");
 
       if (almacenado) setData(JSON.parse(almacenado));
-      if (historico) setStockHist(JSON.parse(historico));
       if (demanda) setDemandaLimpia(JSON.parse(demanda));
     }
+
+    const fetchStockHist = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cloud/stock_historico`);
+        const data = await res.json();
+        setStockHist(data);
+      } catch (err) {
+        console.error("❌ Error al obtener stock histórico desde backend:", err);
+        setStockHist([]);
+      }
+    };
+
+    fetchStockHist();
   }, []);
 
   useEffect(() => {

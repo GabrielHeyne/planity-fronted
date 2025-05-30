@@ -120,7 +120,7 @@ const stock_historico_limpio = stock_historico.map((row) => ({
 sessionStorage.setItem("maestro", JSON.stringify(maestro));
 sessionStorage.setItem("reposiciones", JSON.stringify(reposiciones));
 sessionStorage.setItem("stock_actual", JSON.stringify(stock_actual));
-sessionStorage.setItem("stock_historico", JSON.stringify(stock_historico_limpio));
+
 
       const resStock = await fetch(`${API_BASE_URL}/proyeccion-stock`, {
         method: "POST",
@@ -302,9 +302,7 @@ if (data.reposiciones) {
 if (data.stock_actual) {
   sessionStorage.setItem("stock_actual", JSON.stringify(data.stock_actual));
 }
-if (data.stock_historico) {
-  sessionStorage.setItem("stock_historico", JSON.stringify(data.stock_historico));
-}
+
 if (data.stock_proyectado) {
   sessionStorage.setItem("stock_proyectado", JSON.stringify(data.stock_proyectado));
 }

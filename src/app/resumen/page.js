@@ -4,6 +4,8 @@ import { Line } from "react-chartjs-2";
 import { PackageSearch } from "lucide-react";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import { API_BASE_URL } from "@/utils/apiBase";
+
 dayjs.extend(isSameOrAfter);
 
 import {
@@ -22,6 +24,7 @@ export default function ResumenPage() {
   const [kpis, setKpis] = useState({});
   const [skuSeleccionado, setSkuSeleccionado] = useState("__TOTAL__");
   const [skusDisponibles, setSkusDisponibles] = useState([]);
+  const [stockHist, setStockHist] = useState([]);
   const [graficos, setGraficos] = useState({
   meses: [],
   mesesForecast: [],
@@ -44,22 +47,38 @@ export default function ResumenPage() {
   const [fechaDesde, setFechaDesde] = useState(dayjs().subtract(12, "month").startOf("month").format("YYYY-MM-DD"));
   const [fechaHasta, setFechaHasta] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
 
-  useEffect(() => {
-    const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
-    const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
-    const stockHist = JSON.parse(sessionStorage.getItem("stock_historico") || "[]");
-    const detalleObj = JSON.parse(sessionStorage.getItem("detalle_politicas") || "{}");
-    const detalle = Object.entries(detalleObj).map(([sku, vals]) => ({ sku, ...vals }));
-    const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
+  // 🔁 useEffect 1: cargar stock_historico desde el backend una sola vez
+useEffect(() => {
+  const fetchStockHist = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cloud/stock_historico`);
+      const data = await res.json();
+      setStockHist(data);
+    } catch (err) {
+      console.error("❌ Error al cargar stock histórico desde backend:", err);
+    }
+  };
 
-    const skus = [...new Set(demanda.map((r) => r.sku))];
-    setSkusDisponibles(skus);
+  fetchStockHist();
+}, []);
 
-    calcularKPIs(skuSeleccionado, demanda, maestro, stockHist, detalle, repos);
-    calcularGraficos(skuSeleccionado, demanda);
-  }, [skuSeleccionado, fechaDesde, fechaHasta]);
+// 🔁 useEffect 2: calcular KPIs y gráficos cada vez que cambien filtros o stock
+useEffect(() => {
+  const demanda = JSON.parse(sessionStorage.getItem("demanda_limpia") || "[]");
+  const maestro = JSON.parse(sessionStorage.getItem("maestro") || "[]");
+  const detalleObj = JSON.parse(sessionStorage.getItem("detalle_politicas") || "{}");
+  const detalle = Object.entries(detalleObj).map(([sku, vals]) => ({ sku, ...vals }));
+  const repos = JSON.parse(sessionStorage.getItem("reposiciones") || "[]");
 
-  const calcularKPIs = (sku, demanda, maestro, stockHist, detalle, repos) => {
+  const skus = [...new Set(demanda.map((r) => r.sku))];
+  setSkusDisponibles(skus);
+
+  calcularKPIs(skuSeleccionado, demanda, maestro, stockHist, detalle, repos);
+  calcularGraficos(skuSeleccionado, demanda);
+}, [skuSeleccionado, fechaDesde, fechaHasta, stockHist]);
+
+
+    const calcularKPIs = (sku, demanda, maestro, stockHist, detalle, repos) => {
     const desde = new Date(fechaDesde);
     const hasta = new Date(fechaHasta);
 
@@ -213,8 +232,6 @@ stockProyectadoFiltrado.forEach(f => {
 const mesesProyeccion = Object.keys(agrupado).sort();
 const stockProyValores = mesesProyeccion.map(m => agrupado[m].stock);
 const perdidasFuturas = mesesProyeccion.map(m => agrupado[m].perdida);
-
-const stockHist = JSON.parse(sessionStorage.getItem("stock_historico") || "[]");
 
 const desde = new Date(fechaDesde);
 const hasta = new Date(fechaHasta);
